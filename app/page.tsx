@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 // ─── Banner dimensions (original image is 2857 × 952) ───────────────────────
 const BANNER_W = 2857;
@@ -292,7 +292,7 @@ export default function BannerGenerator() {
              <ImageControls
                 accept="image/*"
                 preview={avatarSrc}
-                onChange={(e) => { handleFileUpload(e, setAvatarSrc); setAvatarScale(1); setAvatarPan({ x: 0, y: 0 }); }}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => { handleFileUpload(e, setAvatarSrc); setAvatarScale(1); setAvatarPan({ x: 0, y: 0 }); }}
                 onClear={() => { setAvatarSrc(null); setAvatarScale(1); setAvatarPan({ x: 0, y: 0 }); }}
                 scale={avatarScale} onScaleChange={setAvatarScale}
                 pan={avatarPan} onPanChange={setAvatarPan}
@@ -309,7 +309,7 @@ export default function BannerGenerator() {
              <ImageControls
                 accept="image/*"
                 preview={flagSrc}
-                onChange={(e) => { handleFileUpload(e, setFlagSrc); setFlagScale(1); setFlagPan({ x: 0, y: 0 }); }}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => { handleFileUpload(e, setFlagSrc); setFlagScale(1); setFlagPan({ x: 0, y: 0 }); }}
                 onClear={() => { setFlagSrc(null); setFlagScale(1); setFlagPan({ x: 0, y: 0 }); }}
                 scale={flagScale} onScaleChange={setFlagScale}
                 pan={flagPan} onPanChange={setFlagPan}
@@ -367,7 +367,15 @@ export default function BannerGenerator() {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function AccordionItem({ title, icon, isOpen, onToggle, children }: any) {
+interface AccordionItemProps {
+  title: string;
+  icon: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+function AccordionItem({ title, icon, isOpen, onToggle, children }: AccordionItemProps) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-200">
       <button 
@@ -391,7 +399,18 @@ function AccordionItem({ title, icon, isOpen, onToggle, children }: any) {
   )
 }
 
-function ImageControls({ accept, preview, onChange, onClear, scale, onScaleChange, pan, onPanChange }: any) {
+interface ImageControlsProps {
+  accept: string;
+  preview: string | null;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onClear: () => void;
+  scale: number;
+  onScaleChange: (v: number) => void;
+  pan: { x: number; y: number };
+  onPanChange: (v: { x: number; y: number }) => void;
+}
+
+function ImageControls({ accept, preview, onChange, onClear, scale, onScaleChange, pan, onPanChange }: ImageControlsProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   
   return (
@@ -437,7 +456,20 @@ function ImageControls({ accept, preview, onChange, onClear, scale, onScaleChang
   )
 }
 
-function TextControls({ placeholder, value, onChange, maxLength, fontFamily, onFontChange, fontSize, onSizeChange, pan, onPanChange }: any) {
+interface TextControlsProps {
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  maxLength: number;
+  fontFamily: string;
+  onFontChange: (v: string) => void;
+  fontSize: number;
+  onSizeChange: (v: number) => void;
+  pan: { x: number; y: number };
+  onPanChange: (v: { x: number; y: number }) => void;
+}
+
+function TextControls({ placeholder, value, onChange, maxLength, fontFamily, onFontChange, fontSize, onSizeChange, pan, onPanChange }: TextControlsProps) {
   return (
     <div className="flex flex-col gap-5 max-w-xl">
       <div className="relative">
