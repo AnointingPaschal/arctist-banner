@@ -6,22 +6,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const BANNER_W = 2857;
 const BANNER_H = 952;
 
-// Avatar bounds (We draw a large square behind the transparent hole)
+// Avatar bounds
 const AVATAR = { cx: 395, cy: 280, r: 235 };
 
-// Flag bounds (We draw behind the rectangular transparent hole)
+// Flag bounds
 const FLAG_RECT = { x: 2542, y: 142, w: 295, h: 205 };
 
-// Text alignment (Precisely mapped to the white area of the pills)
-const TEXT_X = 390;
-const NAME_Y = 614;     // Exact vertical center of top pill
-const CHAPTER_Y = 744;  // Exact vertical center of bottom pill
-const MAX_TEXT_WIDTH = 280;
+// Text alignment
+const TEXT_X = 410; // Shifted right for better padding next to the icon
+const NAME_Y = 610; 
+const CHAPTER_Y = 740;
 
 // ─── Font settings ──────────────────────────────────────────────────────────
-const NAME_FONT = "bold 44px 'Inter', 'Segoe UI', system-ui, sans-serif";
-const CHAPTER_FONT = "500 38px 'Inter', 'Segoe UI', system-ui, sans-serif";
-const TEXT_COLOR = "#0f172a"; // Deep slate blue for high readability
+const NAME_FONT = "bold 52px 'Segoe UI', Arial, sans-serif";
+const CHAPTER_FONT = "500 44px 'Segoe UI', Arial, sans-serif";
+const TEXT_COLOR = "#0f172a"; 
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -46,9 +45,15 @@ export default function BannerGenerator() {
   const [isReady,   setIsReady]   = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
 
+  // ── Image Transform States ──────────────────────────────────────────────
+  const [avatarScale, setAvatarScale] = useState(1);
+  const [avatarPan, setAvatarPan]     = useState({ x: 0, y: 0 });
+  const [flagScale, setFlagScale]     = useState(1);
+  const [flagPan, setFlagPan]         = useState({ x: 0, y: 0 });
+
   // ── Preload banner on mount ─────────────────────────────────────────────
   useEffect(() => {
-    loadImage("/banner.png") // IMPORTANT: Make sure this is a .png to support transparency!
+    loadImage("/banner.png") 
       .then((img) => {
         bannerImgRef.current = img;
         setIsReady(true);
@@ -70,37 +75,34 @@ export default function BannerGenerator() {
     canvas.width  = BANNER_W;
     canvas.height = BANNER_H;
 
-    // Clear canvas completely before drawing
     ctx.clearRect(0, 0, BANNER_W, BANNER_H);
 
-    // 1. DRAW BEHIND: Avatar
+    // 1. DRAW BEHIND: Avatar with Live Transform
     if (avatarSrc) {
       try {
         const avatarImg = await loadImage(avatarSrc);
         ctx.save();
         
-        // Cover-fit logic for the avatar behind the circular hole
         const sz = AVATAR.r * 2;
         const imgAspect = avatarImg.width / avatarImg.height;
-        let sw = sz, sh = sz;
+        let baseW = sz, baseH = sz;
         
-        // Expand to fill the square bounds behind the circle
-        if (imgAspect > 1) { sw = sh * imgAspect; }
-        else               { sh = sw / imgAspect; }
+        if (imgAspect > 1) { baseW = baseH * imgAspect; }
+        else               { baseH = baseW / imgAspect; }
         
-        ctx.drawImage(
-          avatarImg,
-          AVATAR.cx - sw / 2,
-          AVATAR.cy - sh / 2,
-          sw, sh
-        );
+        const finalW = baseW * avatarScale;
+        const finalH = baseH * avatarScale;
+        const drawX = AVATAR.cx - finalW / 2 + avatarPan.x;
+        const drawY = AVATAR.cy - finalH / 2 + avatarPan.y;
+
+        ctx.drawImage(avatarImg, drawX, drawY, finalW, finalH);
         ctx.restore();
       } catch (e) {
         console.error("Avatar load error", e);
       }
     }
 
-    // 2. DRAW BEHIND: Flag
+    // 2. DRAW BEHIND: Flag with Live Transform
     if (flagSrc) {
       try {
         const flagImg = await loadImage(flagSrc);
@@ -109,25 +111,24 @@ export default function BannerGenerator() {
         ctx.save();
         const fAspect = flagImg.width / flagImg.height;
         const rectAspect = w / h;
-        let fw = w, fh = h, fx = x, fy = y;
+        let baseW = w, baseH = h;
         
-        // Cover-fit the flag behind the rectangular hole
-        if (fAspect > rectAspect) {
-          fw = h * fAspect;
-          fx = x - (fw - w) / 2;
-        } else {
-          fh = w / fAspect;
-          fy = y - (fh - h) / 2;
-        }
+        if (fAspect > rectAspect) { baseW = h * fAspect; }
+        else                      { baseH = w / fAspect; }
         
-        ctx.drawImage(flagImg, fx, fy, fw, fh);
+        const finalW = baseW * flagScale;
+        const finalH = baseH * flagScale;
+        const drawX = (x + w / 2) - finalW / 2 + flagPan.x;
+        const drawY = (y + h / 2) - finalH / 2 + flagPan.y;
+        
+        ctx.drawImage(flagImg, drawX, drawY, finalW, finalH);
         ctx.restore();
       } catch (e) {
         console.error("Flag load error", e);
       }
     }
 
-    // 3. DRAW ON TOP: Main Banner (Overlays the photos naturally)
+    // 3. DRAW ON TOP: Main Banner
     ctx.drawImage(bannerImg, 0, 0, BANNER_W, BANNER_H);
 
     // 4. DRAW ON TOP: Name Text
@@ -137,7 +138,8 @@ export default function BannerGenerator() {
       ctx.fillStyle = TEXT_COLOR;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(name.trim(), TEXT_X, NAME_Y, MAX_TEXT_WIDTH);
+      // Removed max-width constraint to stop text squishing
+      ctx.fillText(name.trim(), TEXT_X, NAME_Y);
       ctx.restore();
     }
 
@@ -148,18 +150,17 @@ export default function BannerGenerator() {
       ctx.fillStyle = TEXT_COLOR;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(chapter.trim(), TEXT_X, CHAPTER_Y, MAX_TEXT_WIDTH);
+      ctx.fillText(chapter.trim(), TEXT_X, CHAPTER_Y);
       ctx.restore();
     }
 
     setIsDrawing(false);
-  }, [isReady, avatarSrc, flagSrc, name, chapter]);
+  }, [isReady, avatarSrc, flagSrc, name, chapter, avatarScale, avatarPan, flagScale, flagPan]);
 
   useEffect(() => {
     redraw();
   }, [redraw]);
 
-  // ── File upload helpers ────────────────────────────────────────────────
   const handleFileUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
     setter: (src: string) => void
@@ -173,7 +174,6 @@ export default function BannerGenerator() {
     reader.readAsDataURL(file);
   };
 
-  // ── Download ───────────────────────────────────────────────────────────
   const handleDownload = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -183,17 +183,19 @@ export default function BannerGenerator() {
     link.click();
   };
 
-  // ── Reset ──────────────────────────────────────────────────────────────
   const handleReset = () => {
     setAvatarSrc(null);
     setFlagSrc(null);
     setName("");
     setChapter("");
+    setAvatarScale(1);
+    setAvatarPan({ x: 0, y: 0 });
+    setFlagScale(1);
+    setFlagPan({ x: 0, y: 0 });
   };
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#f8f3ed] to-[#eee8df] py-8 px-4">
-      {/* Header */}
       <div className="max-w-5xl mx-auto mb-8 text-center">
         <div className="inline-flex items-center gap-2 bg-[#0b1130] text-white text-xs font-semibold px-3 py-1 rounded-full mb-4 tracking-wider uppercase">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -203,8 +205,7 @@ export default function BannerGenerator() {
           Arc-tist Banner Generator
         </h1>
         <p className="text-gray-500 text-sm max-w-lg mx-auto">
-          Personalize your community X/Twitter banner — add your photo, flag,
-          name, and chapter, then download your ready-to-use 1:1 banner.
+          Personalize your community X/Twitter banner — adjust your images perfectly!
         </p>
       </div>
 
@@ -228,55 +229,68 @@ export default function BannerGenerator() {
 
         {/* Controls */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* Upload: Avatar */}
+          
           <UploadCard
             label="Profile Photo"
             description="Fits into the circular frame on the left"
             icon={<AvatarIcon />}
             accept="image/*"
             preview={avatarSrc}
-            previewType="circle"
-            onChange={(e) => handleFileUpload(e, setAvatarSrc)}
-            onClear={() => setAvatarSrc(null)}
+            onChange={(e) => {
+              handleFileUpload(e, setAvatarSrc);
+              setAvatarScale(1); setAvatarPan({ x: 0, y: 0 });
+            }}
+            onClear={() => {
+              setAvatarSrc(null);
+              setAvatarScale(1); setAvatarPan({ x: 0, y: 0 });
+            }}
+            scale={avatarScale}
+            onScaleChange={setAvatarScale}
+            pan={avatarPan}
+            onPanChange={setAvatarPan}
           />
 
-          {/* Upload: Flag */}
           <UploadCard
             label="Country / Chapter Flag"
             description="Fits into the rectangular sign on the right"
             icon={<FlagIcon />}
             accept="image/*"
             preview={flagSrc}
-            previewType="rect"
-            onChange={(e) => handleFileUpload(e, setFlagSrc)}
-            onClear={() => setFlagSrc(null)}
+            onChange={(e) => {
+              handleFileUpload(e, setFlagSrc);
+              setFlagScale(1); setFlagPan({ x: 0, y: 0 });
+            }}
+            onClear={() => {
+              setFlagSrc(null);
+              setFlagScale(1); setFlagPan({ x: 0, y: 0 });
+            }}
+            scale={flagScale}
+            onScaleChange={setFlagScale}
+            pan={flagPan}
+            onPanChange={setFlagPan}
           />
 
-          {/* Name input */}
           <TextCard
             label="Your Name"
             placeholder="e.g. Pascal Anointing"
             icon={<PersonIcon />}
             value={name}
             onChange={setName}
-            maxLength={25}
+            maxLength={35}
             hint="Shown in the top white pill"
           />
 
-          {/* Chapter input */}
           <TextCard
             label="Chapter / Location"
-            placeholder="e.g. Arc Nigeria · Lagos"
+            placeholder="e.g. Arc Nigeria"
             icon={<GlobeIcon />}
             value={chapter}
             onChange={setChapter}
-            maxLength={30}
+            maxLength={35}
             hint="Shown in the bottom white pill"
           />
         </div>
 
-        {/* Action bar */}
         <div className="flex items-center gap-3 justify-end">
           <button
             onClick={handleReset}
@@ -287,20 +301,12 @@ export default function BannerGenerator() {
           <button
             onClick={handleDownload}
             disabled={!isReady}
-            className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-[#0b1130] text-white 
-                       hover:bg-[#1a2456] active:scale-[0.98] transition-all 
-                       disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2.5 rounded-xl text-sm font-semibold bg-[#0b1130] text-white hover:bg-[#1a2456] active:scale-[0.98] transition-all disabled:opacity-40 flex items-center gap-2"
           >
             <DownloadIcon />
             Download Banner
           </button>
         </div>
-
-        {/* Footer tip */}
-        <p className="text-center text-xs text-gray-400 pb-4">
-          Your banner is generated locally — no data is uploaded to any server. 
-          Output is full-resolution PNG (2857 × 952 px).
-        </p>
       </div>
     </main>
   );
@@ -314,77 +320,66 @@ interface UploadCardProps {
   icon: React.ReactNode;
   accept: string;
   preview: string | null;
-  previewType: "circle" | "rect";
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClear: () => void;
+  scale: number;
+  onScaleChange: (v: number) => void;
+  pan: { x: number; y: number };
+  onPanChange: (v: { x: number; y: number }) => void;
 }
 
 function UploadCard({
-  label, description, icon, accept,
-  preview, previewType, onChange, onClear
+  label, description, icon, accept, preview, onChange, onClear,
+  scale, onScaleChange, pan, onPanChange
 }: UploadCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col h-full">
       <div className="flex items-center gap-2 mb-1">
         <span className="text-[#0b1130]">{icon}</span>
         <span className="text-sm font-semibold text-[#0b1130]">{label}</span>
       </div>
       <p className="text-xs text-gray-400 mb-4">{description}</p>
 
-      {preview ? (
-        <div className="flex items-center gap-4">
-          {previewType === "circle" ? (
-            <img
-              src={preview}
-              alt="Preview"
-              className="w-16 h-16 rounded-full object-cover border-2 border-gray-100"
-            />
-          ) : (
-            <img
-              src={preview}
-              alt="Preview"
-              className="w-16 h-10 rounded-md object-cover border border-gray-100"
-            />
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={() => inputRef.current?.click()}
-              className="text-xs text-[#0b1130] underline underline-offset-2"
-            >
-              Change
-            </button>
-            <button
-              onClick={onClear}
-              className="text-xs text-red-400 underline underline-offset-2"
-            >
-              Remove
-            </button>
-          </div>
-        </div>
-      ) : (
+      {!preview ? (
         <button
           onClick={() => inputRef.current?.click()}
-          className="w-full border-2 border-dashed border-gray-200 rounded-xl py-6 
-                     flex flex-col items-center gap-2 hover:border-[#0b1130] 
-                     hover:bg-gray-50 transition-colors group cursor-pointer"
+          className="w-full h-full min-h-[120px] border-2 border-dashed border-gray-200 rounded-xl py-6 flex flex-col items-center justify-center gap-2 hover:border-[#0b1130] hover:bg-gray-50 transition-colors group cursor-pointer"
         >
           <span className="text-2xl">📎</span>
           <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">
             Click to upload image
           </span>
-          <span className="text-xs text-gray-300">PNG, JPG, WEBP</span>
         </button>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+             <span className="text-xs text-emerald-600 font-medium px-2">Image Uploaded</span>
+             <div className="flex gap-3">
+               <button onClick={() => inputRef.current?.click()} className="text-xs font-medium text-[#0b1130] hover:underline">Change</button>
+               <button onClick={onClear} className="text-xs font-medium text-red-500 hover:underline">Remove</button>
+             </div>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Zoom</label>
+              <input type="range" min="0.5" max="3" step="0.05" value={scale} onChange={(e) => onScaleChange(parseFloat(e.target.value))} className="w-full accent-[#0b1130]" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Pan Horizontal</label>
+              <input type="range" min="-400" max="400" step="10" value={pan.x} onChange={(e) => onPanChange({...pan, x: parseInt(e.target.value)})} className="w-full accent-[#0b1130]" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Pan Vertical</label>
+              <input type="range" min="-400" max="400" step="10" value={pan.y} onChange={(e) => onPanChange({...pan, y: parseInt(e.target.value)})} className="w-full accent-[#0b1130]" />
+            </div>
+          </div>
+        </div>
       )}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        onChange={onChange}
-        className="hidden"
-      />
+      <input ref={inputRef} type="file" accept={accept} onChange={onChange} className="hidden" />
     </div>
   );
 }
@@ -427,47 +422,8 @@ function TextCard({ label, placeholder, icon, value, onChange, maxLength, hint }
 }
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
-function AvatarIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-    </svg>
-  );
-}
-
-function FlagIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-      <line x1="4" y1="22" x2="4" y2="15"/>
-    </svg>
-  );
-}
-
-function PersonIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-    </svg>
-  );
-}
-
-function GlobeIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="10"/>
-      <line x1="2" y1="12" x2="22" y2="12"/>
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-    </svg>
-  );
-}
-
-function DownloadIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-      <polyline points="7 10 12 15 17 10"/>
-      <line x1="12" y1="15" x2="12" y2="3"/>
-    </svg>
-  );
-}
+function AvatarIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>; }
+function FlagIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>; }
+function PersonIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>; }
+function GlobeIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>; }
+function DownloadIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>; }
