@@ -3,25 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // ─── Banner dimensions (original image is 2857 × 952) ───────────────────────
-// These coordinates map to elements on the banner at native resolution
 const BANNER_W = 2857;
 const BANNER_H = 952;
 
-// Avatar circle (large white circle, top-left)
-const AVATAR = { cx: 237, cy: 337, r: 99 };
+// Avatar circle (large black circle, top-left)
+const AVATAR = { cx: 395, cy: 280, r: 235 };
 
-// Name pill (person icon row)
-const NAME_PILL   = { x: 451, y: 544, w: 363, h: 51 };
+// Name pill (top white pill next to location icon)
+const NAME_PILL   = { x: 260, y: 565, w: 420, h: 90 };
 
-// Chapter pill (globe icon row)
-const CHAPTER_PILL = { x: 451, y: 612, w: 363, h: 51 };
+// Chapter pill (bottom white pill next to globe icon)
+const CHAPTER_PILL = { x: 260, y: 695, w: 420, h: 90 };
 
-// Flag badge — overlaid on bottom-right of avatar circle
-const FLAG_BADGE = { cx: 237 + 72, cy: 337 + 72, r: 36 };
+// Flag badge — The black rectangular flag on the far right
+const FLAG_RECT = { x: 2542, y: 142, w: 295, h: 205 };
 
 // ─── Font sizes at native resolution ────────────────────────────────────────
-const NAME_FONT_SIZE    = 26;
-const CHAPTER_FONT_SIZE = 24;
+const NAME_FONT_SIZE    = 46;
+const CHAPTER_FONT_SIZE = 40;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -116,30 +115,34 @@ export default function BannerGenerator() {
       }
     }
 
-    // 3. Draw flag badge (circular, bottom-right of avatar)
+    // 3. Draw flag (rectangular, top-right of banner)
     if (flagSrc) {
       try {
         const flagImg = await loadImage(flagSrc);
-        const { cx, cy, r } = FLAG_BADGE;
-
-        // White border ring
+        const { x, y, w, h } = FLAG_RECT;
+        
         ctx.save();
-        ctx.beginPath();
-        ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
-        ctx.fillStyle = "#ffffff";
-        ctx.fill();
-        ctx.restore();
-
-        // Flag clipped to circle
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.clip();
+        // Cover-fit the flag into the rectangle
         const fAspect = flagImg.width / flagImg.height;
-        let fw = r * 2, fh = r * 2;
-        if (fAspect > 1) { fw = fh * fAspect; }
-        else             { fh = fw / fAspect; }
-        ctx.drawImage(flagImg, cx - fw / 2, cy - fh / 2, fw, fh);
+        const rectAspect = w / h;
+        let fw = w, fh = h, fx = x, fy = y;
+        
+        if (fAspect > rectAspect) {
+          // Image is wider than rectangle
+          fw = h * fAspect;
+          fx = x - (fw - w) / 2;
+        } else {
+          // Image is taller than rectangle
+          fh = w / fAspect;
+          fy = y - (fh - h) / 2;
+        }
+        
+        // Clip to the exact rectangle size so it doesn't spill over
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
+        ctx.clip();
+        
+        ctx.drawImage(flagImg, fx, fy, fw, fh);
         ctx.restore();
       } catch (e) {
         console.error("Flag load error", e);
@@ -149,7 +152,7 @@ export default function BannerGenerator() {
     // 4. Draw name text into name pill
     if (name.trim()) {
       const { x, y, w, h } = NAME_PILL;
-      const padding = 16;
+      const padding = 24;
       const textX = x + padding;
       const textY = y + h / 2;
 
@@ -169,7 +172,7 @@ export default function BannerGenerator() {
     // 5. Draw chapter text into chapter pill
     if (chapter.trim()) {
       const { x, y, w, h } = CHAPTER_PILL;
-      const padding = 16;
+      const padding = 24;
       const textX = x + padding;
       const textY = y + h / 2;
 
@@ -277,7 +280,7 @@ export default function BannerGenerator() {
           {/* Upload: Flag */}
           <UploadCard
             label="Country / Chapter Flag"
-            description="Appears as a badge on your photo"
+            description="Fits into the rectangular sign on the right"
             icon={<FlagIcon />}
             accept="image/*"
             preview={flagSrc}
@@ -294,7 +297,7 @@ export default function BannerGenerator() {
             value={name}
             onChange={setName}
             maxLength={40}
-            hint="Shown in the name field of the banner"
+            hint="Shown in the top white pill"
           />
 
           {/* Chapter input */}
@@ -305,7 +308,7 @@ export default function BannerGenerator() {
             value={chapter}
             onChange={setChapter}
             maxLength={40}
-            hint="Shown in the chapter field of the banner"
+            hint="Shown in the bottom white pill"
           />
         </div>
 
