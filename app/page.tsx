@@ -235,28 +235,27 @@ export default function BannerGenerator() {
         
         {/* Canvas Preview & Top Actions */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-600">Live Preview</span>
-              {isDrawing && <span className="text-xs text-gray-400">Rendering...</span>}
+          <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <span className="text-base font-bold text-[#0b1130]">Live Preview</span>
+              {isDrawing && <span className="text-xs font-medium text-gray-400 animate-pulse">Rendering...</span>}
             </div>
             
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleDownload}
-                disabled={!isReady}
-                className="px-4 py-2 rounded-lg text-xs font-semibold bg-[#0b1130] text-white hover:bg-[#1a2456] active:scale-[0.98] transition-all disabled:opacity-40 flex items-center gap-2"
-              >
-                <DownloadIcon />
-                Download Banner
-              </button>
-            </div>
+            <button
+              onClick={handleDownload}
+              disabled={!isReady}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[#0b1130] text-white hover:bg-[#1a2456] active:scale-[0.98] transition-all disabled:opacity-40 flex items-center gap-2 whitespace-nowrap"
+            >
+              <DownloadIcon />
+              Download Banner
+            </button>
           </div>
           
-          <div className="p-3 bg-gray-50">
+          {/* Dark Theme Banner Container */}
+          <div className="p-4 sm:p-8 bg-[#0b1130] shadow-inner">
             <canvas
               ref={canvasRef}
-              className="w-full rounded-lg"
+              className="w-full rounded-xl shadow-2xl border border-[#1e2756]"
               style={{ aspectRatio: `${BANNER_W}/${BANNER_H}` }}
             />
           </div>
