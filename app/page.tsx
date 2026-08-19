@@ -6,21 +6,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const BANNER_W = 2857;
 const BANNER_H = 952;
 
-// Avatar circle (large black circle, top-left)
+// Avatar bounds (We draw a large square behind the transparent hole)
 const AVATAR = { cx: 395, cy: 280, r: 235 };
 
-// Name pill (top white pill next to location icon)
-const NAME_PILL   = { x: 260, y: 565, w: 420, h: 90 };
-
-// Chapter pill (bottom white pill next to globe icon)
-const CHAPTER_PILL = { x: 260, y: 695, w: 420, h: 90 };
-
-// Flag badge — The black rectangular flag on the far right
+// Flag bounds (We draw behind the rectangular transparent hole)
 const FLAG_RECT = { x: 2542, y: 142, w: 295, h: 205 };
 
-// ─── Font sizes at native resolution ────────────────────────────────────────
-const NAME_FONT_SIZE    = 46;
-const CHAPTER_FONT_SIZE = 40;
+// Text alignment (Precisely mapped to the white area of the pills)
+const TEXT_X = 390;
+const NAME_Y = 614;     // Exact vertical center of top pill
+const CHAPTER_Y = 744;  // Exact vertical center of bottom pill
+const MAX_TEXT_WIDTH = 280;
+
+// ─── Font settings ──────────────────────────────────────────────────────────
+const NAME_FONT = "bold 44px 'Inter', 'Segoe UI', system-ui, sans-serif";
+const CHAPTER_FONT = "500 38px 'Inter', 'Segoe UI', system-ui, sans-serif";
+const TEXT_COLOR = "#0f172a"; // Deep slate blue for high readability
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -32,23 +33,6 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = reject;
     img.src = src;
   });
-}
-
-function drawRoundedClip(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number, r: number
-) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
 }
 
 export default function BannerGenerator() {
@@ -64,7 +48,7 @@ export default function BannerGenerator() {
 
   // ── Preload banner on mount ─────────────────────────────────────────────
   useEffect(() => {
-    loadImage("/banner.jpg")
+    loadImage("/banner.png") // IMPORTANT: Make sure this is a .png to support transparency!
       .then((img) => {
         bannerImgRef.current = img;
         setIsReady(true);
@@ -86,23 +70,24 @@ export default function BannerGenerator() {
     canvas.width  = BANNER_W;
     canvas.height = BANNER_H;
 
-    // 1. Draw base banner
-    ctx.drawImage(bannerImg, 0, 0, BANNER_W, BANNER_H);
+    // Clear canvas completely before drawing
+    ctx.clearRect(0, 0, BANNER_W, BANNER_H);
 
-    // 2. Draw avatar (clipped to circle)
+    // 1. DRAW BEHIND: Avatar
     if (avatarSrc) {
       try {
         const avatarImg = await loadImage(avatarSrc);
         ctx.save();
-        ctx.beginPath();
-        ctx.arc(AVATAR.cx, AVATAR.cy, AVATAR.r, 0, Math.PI * 2);
-        ctx.clip();
-        // Cover-fit the avatar into the circle
+        
+        // Cover-fit logic for the avatar behind the circular hole
         const sz = AVATAR.r * 2;
         const imgAspect = avatarImg.width / avatarImg.height;
         let sw = sz, sh = sz;
+        
+        // Expand to fill the square bounds behind the circle
         if (imgAspect > 1) { sw = sh * imgAspect; }
         else               { sh = sw / imgAspect; }
+        
         ctx.drawImage(
           avatarImg,
           AVATAR.cx - sw / 2,
@@ -115,32 +100,25 @@ export default function BannerGenerator() {
       }
     }
 
-    // 3. Draw flag (rectangular, top-right of banner)
+    // 2. DRAW BEHIND: Flag
     if (flagSrc) {
       try {
         const flagImg = await loadImage(flagSrc);
         const { x, y, w, h } = FLAG_RECT;
         
         ctx.save();
-        // Cover-fit the flag into the rectangle
         const fAspect = flagImg.width / flagImg.height;
         const rectAspect = w / h;
         let fw = w, fh = h, fx = x, fy = y;
         
+        // Cover-fit the flag behind the rectangular hole
         if (fAspect > rectAspect) {
-          // Image is wider than rectangle
           fw = h * fAspect;
           fx = x - (fw - w) / 2;
         } else {
-          // Image is taller than rectangle
           fh = w / fAspect;
           fy = y - (fh - h) / 2;
         }
-        
-        // Clip to the exact rectangle size so it doesn't spill over
-        ctx.beginPath();
-        ctx.rect(x, y, w, h);
-        ctx.clip();
         
         ctx.drawImage(flagImg, fx, fy, fw, fh);
         ctx.restore();
@@ -149,42 +127,28 @@ export default function BannerGenerator() {
       }
     }
 
-    // 4. Draw name text into name pill
-    if (name.trim()) {
-      const { x, y, w, h } = NAME_PILL;
-      const padding = 24;
-      const textX = x + padding;
-      const textY = y + h / 2;
+    // 3. DRAW ON TOP: Main Banner (Overlays the photos naturally)
+    ctx.drawImage(bannerImg, 0, 0, BANNER_W, BANNER_H);
 
-      ctx.font = `600 ${NAME_FONT_SIZE}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
-      ctx.fillStyle = "#1a1a2e";
+    // 4. DRAW ON TOP: Name Text
+    if (name.trim()) {
+      ctx.save();
+      ctx.font = NAME_FONT;
+      ctx.fillStyle = TEXT_COLOR;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-
-      // Clip text to pill width
-      ctx.save();
-      drawRoundedClip(ctx, x, y, w, h, h / 2);
-      ctx.clip();
-      ctx.fillText(name.trim(), textX, textY);
+      ctx.fillText(name.trim(), TEXT_X, NAME_Y, MAX_TEXT_WIDTH);
       ctx.restore();
     }
 
-    // 5. Draw chapter text into chapter pill
+    // 5. DRAW ON TOP: Chapter Text
     if (chapter.trim()) {
-      const { x, y, w, h } = CHAPTER_PILL;
-      const padding = 24;
-      const textX = x + padding;
-      const textY = y + h / 2;
-
-      ctx.font = `400 ${CHAPTER_FONT_SIZE}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
-      ctx.fillStyle = "#1a1a2e";
+      ctx.save();
+      ctx.font = CHAPTER_FONT;
+      ctx.fillStyle = TEXT_COLOR;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-
-      ctx.save();
-      drawRoundedClip(ctx, x, y, w, h, h / 2);
-      ctx.clip();
-      ctx.fillText(chapter.trim(), textX, textY);
+      ctx.fillText(chapter.trim(), TEXT_X, CHAPTER_Y, MAX_TEXT_WIDTH);
       ctx.restore();
     }
 
@@ -296,7 +260,7 @@ export default function BannerGenerator() {
             icon={<PersonIcon />}
             value={name}
             onChange={setName}
-            maxLength={40}
+            maxLength={25}
             hint="Shown in the top white pill"
           />
 
@@ -307,7 +271,7 @@ export default function BannerGenerator() {
             icon={<GlobeIcon />}
             value={chapter}
             onChange={setChapter}
-            maxLength={40}
+            maxLength={30}
             hint="Shown in the bottom white pill"
           />
         </div>
