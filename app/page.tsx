@@ -13,13 +13,10 @@ const AVATAR = { cx: 395, cy: 280, r: 235 };
 const FLAG_RECT = { x: 2542, y: 142, w: 295, h: 205 };
 
 // Text alignment
-const TEXT_X = 410; // Shifted right for better padding next to the icon
+const TEXT_X = 410;
 const NAME_Y = 610; 
 const CHAPTER_Y = 740;
 
-// ─── Font settings ──────────────────────────────────────────────────────────
-const NAME_FONT = "bold 52px 'Segoe UI', Arial, sans-serif";
-const CHAPTER_FONT = "500 44px 'Segoe UI', Arial, sans-serif";
 const TEXT_COLOR = "#0f172a"; 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,6 +33,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 export default function BannerGenerator() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const bannerImgRef = useRef<HTMLImageElement | null>(null);
 
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
@@ -51,8 +49,19 @@ export default function BannerGenerator() {
   const [flagScale, setFlagScale]     = useState(1);
   const [flagPan, setFlagPan]         = useState({ x: 0, y: 0 });
 
+  // ── Text Settings States ────────────────────────────────────────────────
+  const [nameFont, setNameFont] = useState("'Segoe UI', Arial, sans-serif");
+  const [nameSize, setNameSize] = useState(52);
+  const [chapterFont, setChapterFont] = useState("'Segoe UI', Arial, sans-serif");
+  const [chapterSize, setChapterSize] = useState(44);
+
   // ── Preload banner on mount ─────────────────────────────────────────────
   useEffect(() => {
+    // Initialize offscreen canvas
+    offscreenCanvasRef.current = document.createElement('canvas');
+    offscreenCanvasRef.current.width = BANNER_W;
+    offscreenCanvasRef.current.height = BANNER_H;
+
     loadImage("/banner.png") 
       .then((img) => {
         bannerImgRef.current = img;
@@ -64,13 +73,15 @@ export default function BannerGenerator() {
   // ── Redraw whenever any input changes ──────────────────────────────────
   const redraw = useCallback(async () => {
     const canvas = canvasRef.current;
+    const offscreenCanvas = offscreenCanvasRef.current;
     const bannerImg = bannerImgRef.current;
-    if (!canvas || !bannerImg || !isReady) return;
+    if (!canvas || !offscreenCanvas || !bannerImg || !isReady) return;
 
     setIsDrawing(true);
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const mainCtx = canvas.getContext("2d");
+    const ctx = offscreenCanvas.getContext("2d");
+    if (!mainCtx || !ctx) return;
 
     canvas.width  = BANNER_W;
     canvas.height = BANNER_H;
@@ -134,11 +145,10 @@ export default function BannerGenerator() {
     // 4. DRAW ON TOP: Name Text
     if (name.trim()) {
       ctx.save();
-      ctx.font = NAME_FONT;
+      ctx.font = `bold ${nameSize}px ${nameFont}`;
       ctx.fillStyle = TEXT_COLOR;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      // Removed max-width constraint to stop text squishing
       ctx.fillText(name.trim(), TEXT_X, NAME_Y);
       ctx.restore();
     }
@@ -146,7 +156,7 @@ export default function BannerGenerator() {
     // 5. DRAW ON TOP: Chapter Text
     if (chapter.trim()) {
       ctx.save();
-      ctx.font = CHAPTER_FONT;
+      ctx.font = `500 ${chapterSize}px ${chapterFont}`;
       ctx.fillStyle = TEXT_COLOR;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -154,8 +164,15 @@ export default function BannerGenerator() {
       ctx.restore();
     }
 
+    // Copy offscreen canvas to main canvas to prevent flickering
+    mainCtx.clearRect(0, 0, BANNER_W, BANNER_H);
+    mainCtx.drawImage(offscreenCanvas, 0, 0);
+
     setIsDrawing(false);
-  }, [isReady, avatarSrc, flagSrc, name, chapter, avatarScale, avatarPan, flagScale, flagPan]);
+  }, [
+    isReady, avatarSrc, flagSrc, name, chapter, avatarScale, avatarPan, 
+    flagScale, flagPan, nameFont, nameSize, chapterFont, chapterSize
+  ]);
 
   useEffect(() => {
     redraw();
@@ -192,6 +209,10 @@ export default function BannerGenerator() {
     setAvatarPan({ x: 0, y: 0 });
     setFlagScale(1);
     setFlagPan({ x: 0, y: 0 });
+    setNameFont("'Segoe UI', Arial, sans-serif");
+    setNameSize(52);
+    setChapterFont("'Segoe UI', Arial, sans-serif");
+    setChapterSize(44);
   };
 
   return (
@@ -205,7 +226,7 @@ export default function BannerGenerator() {
           Arc-tist Banner Generator
         </h1>
         <p className="text-gray-500 text-sm max-w-lg mx-auto">
-          Personalize your community X/Twitter banner — adjust your images perfectly!
+          Personalize your community X/Twitter banner — adjust your images and text perfectly!
         </p>
       </div>
 
@@ -215,7 +236,7 @@ export default function BannerGenerator() {
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <span className="text-sm font-medium text-gray-600">Live Preview</span>
             {isDrawing && (
-              <span className="text-xs text-gray-400 animate-pulse">Updating…</span>
+              <span className="text-xs text-gray-400">Rendering...</span>
             )}
           </div>
           <div className="p-3 bg-gray-50">
@@ -270,25 +291,48 @@ export default function BannerGenerator() {
             onPanChange={setFlagPan}
           />
 
-          <TextCard
-            label="Your Name"
-            placeholder="e.g. Pascal Anointing"
-            icon={<PersonIcon />}
-            value={name}
-            onChange={setName}
-            maxLength={35}
-            hint="Shown in the top white pill"
-          />
+          <div className="space-y-4">
+             <TextCard
+                label="Your Name"
+                placeholder="e.g. Pascal Anointing"
+                icon={<PersonIcon />}
+                value={name}
+                onChange={setName}
+                maxLength={35}
+                hint="Shown in the top white pill"
+              />
+              <TextSettingsCard 
+                label="Name Text Settings" 
+                fontFamily={nameFont} 
+                onFontChange={setNameFont} 
+                fontSize={nameSize} 
+                onSizeChange={setNameSize} 
+                minSize={20} 
+                maxSize={100}
+              />
+          </div>
 
-          <TextCard
-            label="Chapter / Location"
-            placeholder="e.g. Arc Nigeria"
-            icon={<GlobeIcon />}
-            value={chapter}
-            onChange={setChapter}
-            maxLength={35}
-            hint="Shown in the bottom white pill"
-          />
+          <div className="space-y-4">
+            <TextCard
+              label="Chapter / Location"
+              placeholder="e.g. Arc Nigeria"
+              icon={<GlobeIcon />}
+              value={chapter}
+              onChange={setChapter}
+              maxLength={35}
+              hint="Shown in the bottom white pill"
+            />
+            <TextSettingsCard 
+              label="Chapter Text Settings" 
+              fontFamily={chapterFont} 
+              onFontChange={setChapterFont} 
+              fontSize={chapterSize} 
+              onSizeChange={setChapterSize} 
+              minSize={20} 
+              maxSize={100}
+            />
+          </div>
+
         </div>
 
         <div className="flex items-center gap-3 justify-end">
@@ -420,6 +464,58 @@ function TextCard({ label, placeholder, icon, value, onChange, maxLength, hint }
     </div>
   );
 }
+
+interface TextSettingsCardProps {
+  label: string;
+  fontFamily: string;
+  onFontChange: (v: string) => void;
+  fontSize: number;
+  onSizeChange: (v: number) => void;
+  minSize: number;
+  maxSize: number;
+}
+
+function TextSettingsCard({ label, fontFamily, onFontChange, fontSize, onSizeChange, minSize, maxSize }: TextSettingsCardProps) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+       <span className="text-sm font-semibold text-[#0b1130] mb-3 block">{label}</span>
+       <div className="space-y-4">
+          <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">Font Family</label>
+              <select 
+                value={fontFamily} 
+                onChange={(e) => onFontChange(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg p-2 text-sm text-[#0b1130] focus:outline-none focus:border-[#0b1130]"
+              >
+                <option value="'Segoe UI', Arial, sans-serif">Segoe UI (Default)</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                <option value="'Courier New', Courier, monospace">Courier New</option>
+                <option value="'Georgia', serif">Georgia</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                <option value="'Verdana', sans-serif">Verdana</option>
+              </select>
+          </div>
+          <div className="space-y-1">
+              <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider flex justify-between">
+                <span>Font Size</span>
+                <span>{fontSize}px</span>
+              </label>
+              <input 
+                type="range" 
+                min={minSize} 
+                max={maxSize} 
+                step="1" 
+                value={fontSize} 
+                onChange={(e) => onSizeChange(parseInt(e.target.value))} 
+                className="w-full accent-[#0b1130]" 
+              />
+          </div>
+       </div>
+    </div>
+  )
+}
+
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 function AvatarIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>; }
