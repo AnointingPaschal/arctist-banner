@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 const BANNER_W = 2857;
 const BANNER_H = 952;
 
-// Avatar bounds 
+// Avatar bounds
 const AVATAR = { cx: 395, cy: 280, r: 235 };
 
 // Flag bounds
@@ -205,13 +205,6 @@ export default function BannerGenerator() {
     link.click();
   };
 
-  const handleDownloadEmpty = () => {
-    const link = document.createElement("a");
-    link.download = "arc-community-banner-template.png";
-    link.href = "/banner.png";
-    link.click();
-  };
-
   const handleReset = () => {
     setAvatarSrc(null);
     setFlagSrc(null);
@@ -230,10 +223,6 @@ export default function BannerGenerator() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#f8f3ed] to-[#eee8df] py-8 px-4">
       <div className="max-w-5xl mx-auto mb-8 text-center">
-        <div className="inline-flex items-center gap-2 bg-[#0b1130] text-white text-xs font-semibold px-3 py-1 rounded-full mb-4 tracking-wider uppercase">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          Arc Community Contest
-        </div>
         <h1 className="text-3xl font-bold text-[#0b1130] mb-2">
           Arc-tist Banner Generator
         </h1>
@@ -253,12 +242,6 @@ export default function BannerGenerator() {
             </div>
             
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleDownloadEmpty}
-                className="px-4 py-2 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-              >
-                Download Empty Template
-              </button>
               <button
                 onClick={handleDownload}
                 disabled={!isReady}
