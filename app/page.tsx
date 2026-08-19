@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 const BANNER_W = 2857;
 const BANNER_H = 952;
 
-// Avatar bounds
+// Avatar bounds 
 const AVATAR = { cx: 395, cy: 280, r: 235 };
 
 // Flag bounds
