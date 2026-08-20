@@ -251,8 +251,8 @@ export default function BannerGenerator() {
             </button>
           </div>
           
-          {/* Dark Theme Banner Container */}
-          <div className="p-4 sm:p-8 bg-[#0b1130] shadow-inner">
+          {/* Dark Theme Banner Container - Padding reduced here */}
+          <div className="p-2 sm:p-3 bg-[#0b1130] shadow-inner">
             <canvas
               ref={canvasRef}
               className="w-full rounded-xl shadow-2xl border border-[#1e2756]"
