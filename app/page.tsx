@@ -266,7 +266,7 @@ export default function BannerGenerator() {
           
           {/* Avatar Accordion */}
           <AccordionItem 
-            title="Profile Photo" 
+            title="Avatar/Photo" 
             icon={<AvatarIcon />} 
             isOpen={openPanel === "avatar"} 
             onToggle={() => togglePanel("avatar")}
@@ -283,7 +283,7 @@ export default function BannerGenerator() {
 
           {/* Flag Accordion */}
           <AccordionItem 
-            title="Country / Chapter Flag" 
+            title="Region / Chapter Flag" 
             icon={<FlagIcon />} 
             isOpen={openPanel === "flag"} 
             onToggle={() => togglePanel("flag")}
