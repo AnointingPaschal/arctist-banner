@@ -199,10 +199,22 @@ export default function BannerGenerator() {
   const handleDownload = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const link = document.createElement("a");
-    link.download = "arc-community-banner.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+
+    // Create a temporary canvas to scale the output to exactly 1500x500
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = 1500;
+    exportCanvas.height = 500;
+    const exportCtx = exportCanvas.getContext("2d");
+    
+    if (exportCtx) {
+      // Draw the large canvas onto the 1500x500 canvas
+      exportCtx.drawImage(canvas, 0, 0, 1500, 500);
+      
+      const link = document.createElement("a");
+      link.download = "arc-community-banner.png";
+      link.href = exportCanvas.toDataURL("image/png");
+      link.click();
+    }
   };
 
   const handleReset = () => {
@@ -251,7 +263,7 @@ export default function BannerGenerator() {
             </button>
           </div>
           
-          {/* Dark Theme Banner Container - Padding reduced here */}
+          {/* Dark Theme Banner Container */}
           <div className="p-2 sm:p-3 bg-[#0b1130] shadow-inner">
             <canvas
               ref={canvasRef}
@@ -266,7 +278,7 @@ export default function BannerGenerator() {
           
           {/* Avatar Accordion */}
           <AccordionItem 
-            title="Avatar/Photo" 
+            title="Profile Photo" 
             icon={<AvatarIcon />} 
             isOpen={openPanel === "avatar"} 
             onToggle={() => togglePanel("avatar")}
@@ -283,7 +295,7 @@ export default function BannerGenerator() {
 
           {/* Flag Accordion */}
           <AccordionItem 
-            title="Region / Chapter Flag" 
+            title="Country / Chapter Flag" 
             icon={<FlagIcon />} 
             isOpen={openPanel === "flag"} 
             onToggle={() => togglePanel("flag")}
@@ -341,6 +353,12 @@ export default function BannerGenerator() {
             Reset All Fields
           </button>
         </div>
+
+        {/* Footer tip */}
+        <p className="text-center text-xs text-gray-400 pb-8">
+          Your banner is generated locally — no data is uploaded to any server. 
+          Output is automatically scaled to the required 1500 × 500 px PNG.
+        </p>
 
       </div>
     </main>
